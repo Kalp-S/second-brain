@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Second Brain — Advanced Hybrid RAG Knowledge Management</title>
+  <meta name="description" content="Production-grade Personal Knowledge Management system using Advanced Hybrid RAG, Parent-Child Chunking, Cross-Encoder Reranking, and Knowledge Graph.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Marked.js for Markdown & Highlight.js for code -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <!-- Vis-Network for Interactive Knowledge Graph -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+        </svg>
+      </div>
+      <div class="brand-title">
+        SECOND BRAIN
+        <span class="brand-badge">Hybrid RAG</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs" id="main-nav-tabs">
+      <button class="nav-tab active" data-tab="tab-chat" id="nav-btn-chat">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        Copilot Chat
+      </button>
+      <button class="nav-tab" data-tab="tab-vault" id="nav-btn-vault">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        Knowledge Vault
+      </button>
+      <button class="nav-tab" data-tab="tab-graph" id="nav-btn-graph">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+        Knowledge Graph
+      </button>
+      <button class="nav-tab" data-tab="tab-diagnostics" id="nav-btn-diagnostics">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        RAG Studio & Benchmarks
+      </button>
+    </nav>
+
+    <!-- System Status Badges -->
+    <div class="header-status">
+      <div class="status-pill" id="ollama-status-badge" title="Local LLM Backend">
+        <span class="status-dot" id="ollama-dot"></span>
+        <span id="ollama-text">Ollama: Connecting...</span>
+      </div>
+      <div class="status-pill" id="doc-counter-badge" title="Total Indexed Documents">
+        <span id="doc-count-display">0 Docs</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="main-container">
+
+    <!-- 1. COPILOT CHAT TAB -->
+    <section class="tab-pane active" id="tab-chat">
+      <div class="chat-container">
+        <!-- Sidebar Sessions -->
+        <aside class="chat-sidebar">
+          <div class="sidebar-title">Conversations</div>
+          <button class="new-chat-btn" id="new-chat-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New Session
+          </button>
+          <div class="session-list" id="chat-session-list">
+            <!-- Dynamic session items inserted here -->
+          </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <div class="chat-main">
+          <div class="chat-messages" id="chat-messages-container">
+            <!-- Welcome Hero shown when empty -->
+            <div class="welcome-hero" id="chat-welcome-hero">
+              <div class="welcome-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path><path d="M12 6v6l4 2"></path></svg>
+              </div>
+              <h1 class="welcome-title">Your Second Brain Copilot</h1>
+              <p class="welcome-desc">
+                Ask deep technical questions across your indexed notes, architecture specs, and system designs. Grounded by an Advanced Hybrid RAG pipeline with cross-encoder reranking.
+              </p>
+              <div class="quick-prompts">
+                <button class="quick-prompt-btn" data-query="How does Raft handle split-brain and leader elections?">
+                  🗳️ <strong>Raft Consensus</strong>: Split-brain & elections
+                </button>
+                <button class="quick-prompt-btn" data-query="Explain the BESS control layers and Modbus polling constraints.">
+                  ⚡ <strong>BESS Architecture</strong>: Modbus & EMS
+                </button>
+                <button class="quick-prompt-btn" data-query="Why is Reciprocal Rank Fusion better than score normalization?">
+                  📐 <strong>Hybrid RAG</strong>: Why RRF math works
+                </button>
+                <button class="quick-prompt-btn" data-query="Compare 2-Phase Locking vs Multi-Version Concurrency Control.">
+                  🗄️ <strong>Database Concurrency</strong>: 2PL vs MVCC
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Chat Input Area -->
+          <div class="chat-input-area">
+            <div class="strategy-bar">
+              <div class="strategy-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                Retrieval Strategy:
+              </div>
+              <select class="strategy-select" id="strategy-selector">
+                <option value="hybrid_reranked" selected>Hybrid + Cross-Encoder Reranker (Recommended)</option>
+                <option value="hybrid">Hybrid RRF (Dense + BM25)</option>
+                <option value="dense_only">Dense Vector Only (Cosine)</option>
+                <option value="bm25_only">Sparse BM25 Only (Lexical)</option>
+              </select>
+            </div>
+
+            <div class="input-container">
+              <textarea
+                class="chat-textarea"
+                id="chat-input"
+                rows="1"
+                placeholder="Ask your Second Brain anything... (Shift+Enter for new line)"
+              ></textarea>
+              <button class="send-btn" id="send-chat-btn" title="Send message">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. KNOWLEDGE VAULT TAB -->
+    <section class="tab-pane" id="tab-vault">
+      <div class="vault-view">
+        <div class="vault-header">
+          <div>
+            <h2 class="section-title">Knowledge Vault</h2>
+            <p class="section-subtitle">Manage, index, and preview markdown files, architecture notes, and code documents.</p>
+          </div>
+          <div class="vault-actions">
+            <button class="btn-secondary" id="sync-vault-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              Sync Sample Vault
+            </button>
+            <label class="new-chat-btn" style="cursor: pointer;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              Upload Notes
+              <input type="file" id="file-upload-input" multiple style="display: none;" accept=".md,.markdown,.pdf,.txt,.py,.go">
+            </label>
+          </div>
+        </div>
+
+        <!-- Dropzone -->
+        <div class="upload-dropzone" id="upload-dropzone">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <div style="font-weight: 600; margin-bottom: 4px;">Drag & Drop Markdown, PDF, or Code files here</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted);">Supports .md, .pdf, .txt, .py, .go — parsed with hierarchical parent-child chunking and SHA-256 deduplication</div>
+        </div>
+
+        <!-- Document Cards Grid -->
+        <div class="doc-grid" id="document-grid-container">
+          <!-- Dynamically populated document cards -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. KNOWLEDGE GRAPH TAB -->
+    <section class="tab-pane" id="tab-graph">
+      <div class="graph-container">
+        <div id="network-graph"></div>
+        <div class="graph-overlay-panel">
+          <div style="font-weight: 700; font-size: 0.95rem;">Interactive Knowledge Graph</div>
+          <div class="graph-legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #6366f1;"></span>
+              <span>Document Nodes</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #06b6d4;"></span>
+              <span>Topic & Tag Nodes</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #a855f7;"></span>
+              <span>Cross-References</span>
+            </div>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">
+            Click any node to inspect relationships. Scroll to zoom, drag to pan.
+          </div>
+          <button class="btn-secondary" id="graph-fit-btn" style="font-size: 0.8rem; padding: 6px 10px;">
+            Fit Graph to View
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. RAG DIAGNOSTICS & BENCHMARK STUDIO TAB -->
+    <section class="tab-pane" id="tab-diagnostics">
+      <div class="diagnostics-view">
+        <div>
+          <h2 class="section-title">RAG Studio & Comparative Benchmarking</h2>
+          <p class="section-subtitle">Empirical head-to-head comparison of retrieval strategies and real-time RAG Triad observability.</p>
+        </div>
+
+        <!-- Benchmark Runner Card -->
+        <div class="benchmark-card">
+          <div style="font-weight: 600; font-size: 1.05rem;">Head-to-Head Strategy Benchmark</div>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);">
+            Execute the same query simultaneously across all 4 retrieval strategies to compare latency, top document overlap, and automated RAG Triad scores.
+          </p>
+          <div class="benchmark-input-row">
+            <input type="text" class="benchmark-input" id="benchmark-query-input" value="How does Raft leader election prevent split-brain?" placeholder="Enter test query for benchmark...">
+            <button class="new-chat-btn" id="run-benchmark-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              Run Benchmark
+            </button>
+          </div>
+
+          <!-- Benchmark Results Table -->
+          <div id="benchmark-results-container" style="display: none;">
+            <table class="benchmark-table">
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Latency (ms)</th>
+                  <th>Top Retrieved Documents</th>
+                  <th>Context Relevance</th>
+                  <th>Faithfulness</th>
+                  <th>Composite RAG Score</th>
+                </tr>
+              </thead>
+              <tbody id="benchmark-table-body">
+                <!-- Dynamically filled rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RAG Architecture & Invariants Card -->
+        <div class="benchmark-card">
+          <div style="font-weight: 600; font-size: 1.05rem;">Engineering Architecture Invariants</div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 10px;">
+            <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <div style="color: var(--accent-secondary); font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Reciprocal Rank Fusion (RRF)</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+                In-memory ranking merger ($k=60$). Eliminates calibration error between unbounded BM25 scores and bounded cosine distance vectors.
+              </div>
+            </div>
+            <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <div style="color: #a855f7; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Cross-Encoder Reranking</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+                ONNX cross-attention transformer (`FlashRank`). Filters out semantically vague bi-encoder candidates, pruning noise before LLM prompt injection.
+              </div>
+            </div>
+            <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <div style="color: var(--accent-emerald); font-weight: 600; font-size: 0.88rem; margin-bottom: 6px;">Parent-Child Hierarchy</div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+                Small child chunks (~300 chars) match query vectors with surgical precision; parent sections (~1200 chars) supply complete context to the LLM.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Slide-out Drawer Backdrop & Container -->
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="slide-drawer" id="slide-drawer">
+    <div class="drawer-header">
+      <h3 id="drawer-title" style="font-size: 1.05rem; font-weight: 600;">Source Inspector</h3>
+      <button class="drawer-close" id="drawer-close-btn">&times;</button>
+    </div>
+    <div class="drawer-content" id="drawer-body">
+      <!-- Dynamic drawer content (Citations, Doc Viewer, Trace) -->
+    </div>
+  </aside>
+
+  <!-- Frontend Logic Modules -->
+  <script src="/js/api.js"></script>
+  <script src="/js/chat.js"></script>
+  <script src="/js/documents.js"></script>
+  <script src="/js/graph.js"></script>
+  <script src="/js/trace.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
