@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+build/
+dist/
+*.egg-info/
+
+# Second Brain Data
+data/*.db
+data/qdrant/
+data/cache/
+
+# Environment
+.env
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+*.log
