@@ -75,6 +75,11 @@ const App = {
       const text = document.getElementById("ollama-text");
       const docCount = document.getElementById("doc-count-display");
 
+      const demoBadge = document.getElementById("demo-mode-badge");
+      if (demoBadge && status.demo_mode) {
+        demoBadge.style.display = "flex";
+      }
+
       if (status.ollama_status === "connected") {
         dot.className = "status-dot";
         text.textContent = `Ollama: ${status.active_llm_model}`;

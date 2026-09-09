@@ -58,6 +58,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+import time
+from collections import defaultdict
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -66,6 +71,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Sliding-window IP Rate Limiter for RAG inference
+_request_history: defaultdict = defaultdict(list)
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    if request.url.path.startswith("/api/v1/rag/"):
+        # Detect true client IP behind Cloudflare or reverse proxy
+        client_ip = (
+            request.headers.get("cf-connecting-ip")
+            or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+            or (request.client.host if request.client else "127.0.0.1")
+        )
+        now = time.time()
+        window_start = now - 60.0
+        
+        # Prune older records
+        history = [ts for ts in _request_history[client_ip] if ts > window_start]
+        if len(history) >= settings.RATE_LIMIT_PER_MINUTE:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded (demo mode). Please wait a moment before trying again."},
+                headers={"Retry-After": "15"}
+            )
+        history.append(now)
+        _request_history[client_ip] = history
+
+    return await call_next(request)
 
 # API Routers
 app.include_router(documents_router, prefix="/api/v1")

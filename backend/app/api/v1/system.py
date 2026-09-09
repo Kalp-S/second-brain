@@ -31,6 +31,7 @@ async def get_system_status(session: AsyncSession = Depends(get_db)) -> Dict[str
 
     return {
         "status": "healthy",
+        "demo_mode": settings.DEMO_MODE,
         "app_name": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "llm_provider": settings.LLM_PROVIDER,
