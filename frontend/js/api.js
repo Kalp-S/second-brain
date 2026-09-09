@@ -21,11 +21,19 @@ const API = {
 
   async deleteDocument(docId) {
     const res = await fetch(`${this.baseUrl}/documents/${docId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Delete failed with status ${res.status}`);
+    }
     return await res.json();
   },
 
   async syncVault() {
     const res = await fetch(`${this.baseUrl}/documents/sync-vault`, { method: "POST" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Sync failed with status ${res.status}`);
+    }
     return await res.json();
   },
 
@@ -38,6 +46,10 @@ const API = {
       method: "POST",
       body: formData,
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Upload failed with status ${res.status}`);
+    }
     return await res.json();
   },
 

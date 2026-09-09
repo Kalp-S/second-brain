@@ -55,3 +55,19 @@ async def test_end_to_end_rag_flow():
         assert len(rag_data["citations"]) > 0
         assert "evaluation" in rag_data
         assert rag_data["evaluation"]["composite_score"] > 0.0
+
+@pytest.mark.asyncio
+async def test_demo_mode_blocks_upload_and_delete():
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        # Test upload blocked in demo mode
+        upload_res = await client.post(
+            "/api/v1/documents/upload",
+            files={"files": ("test.txt", b"dummy content", "text/plain")}
+        )
+        assert upload_res.status_code == 403
+        assert "disabled in public demo mode" in upload_res.json()["detail"]
+
+        # Test delete blocked in demo mode
+        delete_res = await client.delete("/api/v1/documents/dummy-doc-id")
+        assert delete_res.status_code == 403
+        assert "disabled in public demo mode" in delete_res.json()["detail"]

@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "Second Brain RAG"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    DEMO_MODE: bool = True
+    RATE_LIMIT_PER_MINUTE: int = 20
 
     # Storage Paths
     BASE_PATH: Path = BASE_DIR

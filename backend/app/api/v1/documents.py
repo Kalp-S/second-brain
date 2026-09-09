@@ -20,6 +20,11 @@ async def upload_documents(
     pipeline: IngestionPipeline = Depends(get_ingestion_pipeline)
 ) -> Dict[str, Any]:
     """Upload and index multiple documents (Markdown, PDF, Code, Text)."""
+    if settings.DEMO_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Document uploads are disabled in public demo mode to preserve sample vault integrity."
+        )
     results = []
     for file in files:
         try:
@@ -147,6 +152,11 @@ async def delete_document(
     pipeline: IngestionPipeline = Depends(get_ingestion_pipeline)
 ) -> Dict[str, Any]:
     """Delete a document and purge all associated vector and lexical index entries."""
+    if settings.DEMO_MODE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Document deletions are disabled in public demo mode to preserve sample vault integrity."
+        )
     success = await pipeline.delete_document(doc_id, session)
     if not success:
         raise HTTPException(status_code=404, detail="Document not found")
