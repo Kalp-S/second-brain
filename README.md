@@ -43,36 +43,36 @@ In real-world production systems, naive RAG suffers from fatal failure modes:
 ```mermaid
 graph TD
     subgraph Ingestion["1. Multi-Format Ingestion Pipeline"]
-        Doc[Markdown / PDF / Code / Text] --> Hash[SHA-256 Deduplication & Parser]
-        Hash --> Chunker[Hierarchical Chunker: Parent Context + Child Chunks]
-        Chunker --> DocStore[(SQLite Store: Documents & Parents)]
-        Chunker --> VectorIndex[(Vector Store: Qdrant Local Embedded)]
-        Chunker --> SparseIndex[(BM25 Lexical Index)]
+        Doc["Markdown / PDF / Code / Text"] --> Hash["SHA-256 Deduplication & Parser"]
+        Hash --> Chunker["Hierarchical Chunker: Parent Context + Child Chunks"]
+        Chunker --> DocStore[("SQLite Store: Documents & Parents")]
+        Chunker --> VectorIndex[("Vector Store: Qdrant Local Embedded")]
+        Chunker --> SparseIndex[("BM25 Lexical Index")]
     end
 
     subgraph Retrieval["2. Advanced Multi-Stage Retrieval"]
-        Query[User Query] --> Preproc[Query Normalization]
-        Preproc --> DenseSearch[Dense Vector Search: Cosine Similarity]
-        Preproc --> BM25Search[Sparse BM25 Search: Keyword Frequency]
-        DenseSearch --> RRF[Reciprocal Rank Fusion - RRF Merger]
+        Query["User Query"] --> Preproc["Query Normalization"]
+        Preproc --> DenseSearch["Dense Vector Search: Cosine Similarity"]
+        Preproc --> BM25Search["Sparse BM25 Search: Keyword Frequency"]
+        DenseSearch --> RRF["Reciprocal Rank Fusion - RRF Merger"]
         BM25Search --> RRF
-        RRF --> Rerank[Cross-Encoder Reranker: Joint Attention Scoring]
-        Rerank --> Expand[Parent Context Expansion]
+        RRF --> Rerank["Cross-Encoder Reranker: Joint Attention Scoring"]
+        Rerank --> Expand["Parent Context Expansion"]
     end
 
     subgraph Generation["3. Generation & Observability"]
-        Expand --> Prompt[Grounded Context Assembler with Citations]
-        Prompt --> LLM[LLM Engine: Local Ollama / OpenAI / Claude]
-        LLM --> Stream[Server-Sent Events (SSE) Streaming Response]
-        Stream --> Eval[RAG Triad Evaluator: Faithfulness & Relevance]
-        Stream --> Trace[Retrieval Trace Inspector]
+        Expand --> Prompt["Grounded Context Assembler with Citations"]
+        Prompt --> LLM["LLM Engine: Local Ollama / OpenAI / Claude"]
+        LLM --> Stream["Server-Sent Events (SSE) Streaming Response"]
+        Stream --> Eval["RAG Triad Evaluator: Faithfulness & Relevance"]
+        Stream --> Trace["Retrieval Trace Inspector"]
     end
 
     subgraph UI["4. Modern Second Brain Dashboard"]
-        UI_Chat[Conversational RAG Copilot]
-        UI_Docs[Document Manager & Markdown Viewer]
-        UI_Graph[Interactive Knowledge Graph View]
-        UI_Trace[RAG Diagnostics & Benchmark Studio]
+        UI_Chat["Conversational RAG Copilot"]
+        UI_Docs["Document Manager & Markdown Viewer"]
+        UI_Graph["Interactive Knowledge Graph View"]
+        UI_Trace["RAG Diagnostics & Benchmark Studio"]
     end
 ```
 
