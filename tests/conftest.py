@@ -11,6 +11,7 @@ from backend.app.core.dependencies import (
     SparseBM25Retriever,
     get_dense_retriever,
     get_ingestion_pipeline,
+    get_llm,
     get_rag_retriever,
     get_reranker,
     get_sparse_retriever,
@@ -18,6 +19,7 @@ from backend.app.core.dependencies import (
 )
 from backend.app.db.database import get_db
 from backend.app.main import _request_history, app
+from backend.app.services.llm.provider import MockProvider
 
 # In-memory SQLite for complete test isolation
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -66,6 +68,7 @@ async def setup_test_environment():
     app.dependency_overrides[get_sparse_retriever] = lambda: test_sparse
     app.dependency_overrides[get_rag_retriever] = lambda: test_rag
     app.dependency_overrides[get_ingestion_pipeline] = lambda: test_pipeline
+    app.dependency_overrides[get_llm] = lambda: MockProvider()
 
     yield
 
