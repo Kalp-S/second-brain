@@ -82,3 +82,12 @@ jobs:
           tags: second-brain:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  ci-success:
+    name: CI Test Suite Pass
+    needs: [lint-and-typecheck, test-suite, docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate Check
+        run: echo "All linting, test suites, and Docker build gates passed."
+
