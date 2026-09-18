@@ -182,13 +182,19 @@ const ChatController = {
               this.renderCitations(citationsTrayEl, currentCitations);
             } catch (e) {}
           } else if (eventType === "done") {
+            try {
+              const doneData = JSON.parse(eventData);
+              if (doneData.session_id) {
+                this.currentSessionId = doneData.session_id;
+              }
+            } catch (e) {}
             if (currentTrace) {
               traceBtnEl.style.display = "flex";
               traceBtnEl.addEventListener("click", () => {
                 TraceInspector.showTrace(currentTrace);
               });
             }
-            this.loadSessions();
+            await this.loadSessions();
           }
         }
       }

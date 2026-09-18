@@ -14,7 +14,7 @@ from backend.app.core.dependencies import (
     get_llm,
     get_rag_retriever,
 )
-from backend.app.db.database import get_db
+from backend.app.db.database import async_session_factory, get_db
 from backend.app.db.models import ChatMessage, ChatSession, EvaluationRecord
 from backend.app.services.llm.evaluator import RAGTriadEvaluator
 from backend.app.services.llm.prompt import SYSTEM_PROMPT, build_rag_prompt
@@ -144,11 +144,20 @@ async def stream_rag(
     llm: BaseLLMProvider = Depends(get_llm),
 ):
     """Server-Sent Events (SSE) streaming endpoint for low Time-to-First-Token (TTFT) interactions."""
+    t0_start = time.perf_counter()
     retrieval_res = await retriever.retrieve(
         query=req.query, session=session, strategy=req.strategy, top_k=req.top_k
     )
 
     rag_prompt = build_rag_prompt(req.query, retrieval_res.context_text)
+
+    # 1. Resolve or create chat session
+    session_id = req.session_id
+    if not session_id:
+        chat_sess = ChatSession(title=req.query[:40] + ("..." if len(req.query) > 40 else ""))
+        session.add(chat_sess)
+        await session.commit()
+        session_id = chat_sess.id
 
     async def event_generator():
         # Step 1: Emit retrieval trace and candidates
@@ -166,6 +175,8 @@ async def stream_rag(
             full_answer_parts.append(fallback)
 
         full_answer = "".join(full_answer_parts)
+        total_time_ms = round((time.perf_counter() - t0_start) * 1000, 2)
+        retrieval_res.trace["latencies_ms"]["end_to_end"] = total_time_ms
 
         # Step 3: Run RAG Triad evaluation
         eval_metrics = RAGTriadEvaluator.evaluate(
@@ -178,8 +189,38 @@ async def stream_rag(
         # Step 4: Emit citations
         yield f"event: citations\ndata: {json.dumps(retrieval_res.citations)}\n\n"
 
-        # Step 5: Finished
-        yield f"event: done\ndata: {json.dumps({'status': 'finished'})}\n\n"
+        # Step 5: Persist conversation messages & evaluation record in SQLite
+        try:
+            async with async_session_factory() as db:
+                user_msg = ChatMessage(
+                    session_id=session_id, role="user", content=req.query, strategy=req.strategy
+                )
+                assistant_msg = ChatMessage(
+                    session_id=session_id,
+                    role="assistant",
+                    content=full_answer,
+                    strategy=req.strategy,
+                    citations=json.dumps(retrieval_res.citations),
+                    retrieval_trace=json.dumps(retrieval_res.trace),
+                    faithfulness_score=eval_metrics["faithfulness"],
+                )
+                eval_rec = EvaluationRecord(
+                    query=req.query,
+                    strategy=req.strategy,
+                    context_relevance=eval_metrics["context_relevance"],
+                    faithfulness=eval_metrics["faithfulness"],
+                    answer_relevance=eval_metrics["answer_relevance"],
+                    latency_ms=total_time_ms,
+                )
+                db.add(user_msg)
+                db.add(assistant_msg)
+                db.add(eval_rec)
+                await db.commit()
+        except Exception as e:
+            print(f"[StreamRAG] Failed to persist chat session: {e}")
+
+        # Step 6: Finished event with session_id
+        yield f"event: done\ndata: {json.dumps({'status': 'finished', 'session_id': session_id})}\n\n"
 
     return StreamingResponse(
         event_generator(),
