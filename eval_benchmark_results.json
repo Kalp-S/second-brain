@@ -1,0 +1,80 @@
+{
+  "benchmark_timestamp": "2026-09-18 20:33:42Z",
+  "aggregate_summary": {
+    "dense_only": {
+      "strategy": "Dense Vector Only (BGE-small)",
+      "avg_latency_ms": 6516.7,
+      "avg_context_relevance": 0.873,
+      "avg_faithfulness": 0.889,
+      "avg_composite_score": 0.797
+    },
+    "bm25_only": {
+      "strategy": "Sparse BM25 Only (Lexical)",
+      "avg_latency_ms": 8296.6,
+      "avg_context_relevance": 0.873,
+      "avg_faithfulness": 0.75,
+      "avg_composite_score": 0.802
+    },
+    "hybrid": {
+      "strategy": "Hybrid RRF (Dense + BM25)",
+      "avg_latency_ms": 3756.8,
+      "avg_context_relevance": 0.873,
+      "avg_faithfulness": 1.0,
+      "avg_composite_score": 0.872
+    },
+    "hybrid_reranked": {
+      "strategy": "Hybrid + Cross-Encoder Reranker",
+      "avg_latency_ms": 7212.1,
+      "avg_context_relevance": 0.873,
+      "avg_faithfulness": 0.688,
+      "avg_composite_score": 0.747
+    }
+  },
+  "evaluations": [
+    {
+      "query": "How does Raft leader election handle split votes and prevent split-brain?",
+      "strategies": {
+        "dense_only": {
+          "strategy_id": "dense_only",
+          "label": "Dense Vector Only (BGE-small)",
+          "total_latency_ms": 6516.66,
+          "retrieval_latency_ms": 78.49,
+          "context_relevance": 0.873,
+          "faithfulness": 0.889,
+          "composite_score": 0.797,
+          "top_doc": "Distributed Consensus: The Raft Protocol"
+        },
+        "bm25_only": {
+          "strategy_id": "bm25_only",
+          "label": "Sparse BM25 Only (Lexical)",
+          "total_latency_ms": 8296.56,
+          "retrieval_latency_ms": 74.65,
+          "context_relevance": 0.873,
+          "faithfulness": 0.75,
+          "composite_score": 0.802,
+          "top_doc": "Distributed Consensus: The Raft Protocol"
+        },
+        "hybrid": {
+          "strategy_id": "hybrid",
+          "label": "Hybrid RRF (Dense + BM25)",
+          "total_latency_ms": 3756.84,
+          "retrieval_latency_ms": 78.56,
+          "context_relevance": 0.873,
+          "faithfulness": 1.0,
+          "composite_score": 0.872,
+          "top_doc": "Distributed Consensus: The Raft Protocol"
+        },
+        "hybrid_reranked": {
+          "strategy_id": "hybrid_reranked",
+          "label": "Hybrid + Cross-Encoder Reranker",
+          "total_latency_ms": 7212.08,
+          "retrieval_latency_ms": 135.21,
+          "context_relevance": 0.873,
+          "faithfulness": 0.688,
+          "composite_score": 0.747,
+          "top_doc": "Distributed Consensus: The Raft Protocol"
+        }
+      }
+    }
+  ]
+}

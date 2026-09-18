@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Any, List
+
 
 class RAGTriadEvaluator:
     """
@@ -10,17 +10,13 @@ class RAGTriadEvaluator:
     """
 
     @staticmethod
-    def evaluate(
-        query: str,
-        retrieved_context: str,
-        generated_answer: str
-    ) -> Dict[str, float]:
+    def evaluate(query: str, retrieved_context: str, generated_answer: str) -> dict[str, float]:
         if not retrieved_context.strip() or not generated_answer.strip():
             return {
                 "context_relevance": 0.0,
                 "faithfulness": 0.0,
                 "answer_relevance": 0.0,
-                "composite_score": 0.0
+                "composite_score": 0.0,
             }
 
         # 1. Context Relevance
@@ -32,13 +28,15 @@ class RAGTriadEvaluator:
         # 3. Answer Relevance
         answer_relevance = RAGTriadEvaluator._calc_answer_relevance(query, generated_answer)
 
-        composite = round((context_relevance * 0.3 + faithfulness * 0.4 + answer_relevance * 0.3), 3)
+        composite = round(
+            (context_relevance * 0.3 + faithfulness * 0.4 + answer_relevance * 0.3), 3
+        )
 
         return {
             "context_relevance": round(context_relevance, 3),
             "faithfulness": round(faithfulness, 3),
             "answer_relevance": round(answer_relevance, 3),
-            "composite_score": composite
+            "composite_score": composite,
         }
 
     @staticmethod

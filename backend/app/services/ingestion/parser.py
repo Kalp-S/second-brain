@@ -1,8 +1,10 @@
-import re
 import hashlib
+import re
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from pypdf import PdfReader
+
 
 class ParsedDocument:
     def __init__(
@@ -12,9 +14,9 @@ class ParsedDocument:
         file_type: str,
         content_hash: str,
         byte_size: int,
-        tags: List[str],
-        links: List[str],
-        metadata: Optional[Dict[str, Any]] = None
+        tags: list[str],
+        links: list[str],
+        metadata: dict[str, Any] | None = None,
     ):
         self.title = title
         self.content = content
@@ -24,6 +26,7 @@ class ParsedDocument:
         self.tags = tags
         self.links = links
         self.metadata = metadata or {}
+
 
 class DocumentParser:
     """Parses various document formats into standardized ParsedDocument instances."""
@@ -39,11 +42,15 @@ class DocumentParser:
         byte_size = len(raw_bytes)
 
         if ext in [".md", ".markdown"]:
-            return cls._parse_markdown(filename, raw_bytes.decode("utf-8", errors="replace"), content_hash, byte_size)
+            return cls._parse_markdown(
+                filename, raw_bytes.decode("utf-8", errors="replace"), content_hash, byte_size
+            )
         elif ext == ".pdf":
             return cls._parse_pdf(filename, raw_bytes, content_hash, byte_size)
         elif ext in [".py", ".go", ".java", ".c", ".cpp", ".js", ".ts", ".sh", ".rs"]:
-            return cls._parse_code(filename, raw_bytes.decode("utf-8", errors="replace"), ext, content_hash, byte_size)
+            return cls._parse_code(
+                filename, raw_bytes.decode("utf-8", errors="replace"), ext, content_hash, byte_size
+            )
         else:
             # Fallback to plain text
             text = raw_bytes.decode("utf-8", errors="replace")
@@ -57,14 +64,16 @@ class DocumentParser:
                 content_hash=content_hash,
                 byte_size=byte_size,
                 tags=tags,
-                links=links
+                links=links,
             )
 
     @classmethod
-    def _parse_markdown(cls, filename: str, text: str, content_hash: str, byte_size: int) -> ParsedDocument:
+    def _parse_markdown(
+        cls, filename: str, text: str, content_hash: str, byte_size: int
+    ) -> ParsedDocument:
         # Extract title from frontmatter or first # H1
         title = Path(filename).stem.replace("_", " ").replace("-", " ").title()
-        metadata: Dict[str, Any] = {}
+        metadata: dict[str, Any] = {}
 
         # Check for YAML frontmatter
         fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n(.*)$", text, re.DOTALL)
@@ -92,7 +101,13 @@ class DocumentParser:
         if "tags" in metadata:
             raw_fm_tags = metadata["tags"]
             if isinstance(raw_fm_tags, str):
-                tags.extend([t.strip().lstrip("#") for t in raw_fm_tags.replace("[", "").replace("]", "").split(",") if t.strip()])
+                tags.extend(
+                    [
+                        t.strip().lstrip("#")
+                        for t in raw_fm_tags.replace("[", "").replace("]", "").split(",")
+                        if t.strip()
+                    ]
+                )
 
         # Extract links (e.g. [[ObsidianLink]] or [Markdown](link))
         links = cls._extract_links(content_body)
@@ -105,18 +120,21 @@ class DocumentParser:
             byte_size=byte_size,
             tags=list(set(tags)),
             links=list(set(links)),
-            metadata=metadata
+            metadata=metadata,
         )
 
     @classmethod
-    def _parse_pdf(cls, filename: str, raw_bytes: bytes, content_hash: str, byte_size: int) -> ParsedDocument:
+    def _parse_pdf(
+        cls, filename: str, raw_bytes: bytes, content_hash: str, byte_size: int
+    ) -> ParsedDocument:
         import io
+
         reader = PdfReader(io.BytesIO(raw_bytes))
         extracted_pages = []
         for i, page in enumerate(reader.pages):
             page_text = page.extract_text() or ""
             if page_text.strip():
-                extracted_pages.append(f"--- [Page {i+1}] ---\n{page_text}")
+                extracted_pages.append(f"--- [Page {i + 1}] ---\n{page_text}")
 
         full_content = "\n\n".join(extracted_pages)
         title = Path(filename).stem.replace("_", " ").replace("-", " ").title()
@@ -134,11 +152,13 @@ class DocumentParser:
             byte_size=byte_size,
             tags=list(set(tags)),
             links=list(set(links)),
-            metadata={"num_pages": len(reader.pages)}
+            metadata={"num_pages": len(reader.pages)},
         )
 
     @classmethod
-    def _parse_code(cls, filename: str, code: str, ext: str, content_hash: str, byte_size: int) -> ParsedDocument:
+    def _parse_code(
+        cls, filename: str, code: str, ext: str, content_hash: str, byte_size: int
+    ) -> ParsedDocument:
         title = filename
         tags = [ext.lstrip("."), "code"]
         links = cls._extract_links(code)
@@ -150,11 +170,11 @@ class DocumentParser:
             byte_size=byte_size,
             tags=tags,
             links=links,
-            metadata={"language": ext.lstrip(".")}
+            metadata={"language": ext.lstrip(".")},
         )
 
     @staticmethod
-    def _extract_tags(text: str) -> List[str]:
+    def _extract_tags(text: str) -> list[str]:
         # Match hashtags like #distributed-systems, #raft, #python
         # Avoid matching headers like # Header
         raw_tags = re.findall(r"(?:^|\s)#([a-zA-Z0-9_\-]+)", text)
@@ -163,11 +183,11 @@ class DocumentParser:
         return list(set(tags))
 
     @staticmethod
-    def _extract_links(text: str) -> List[str]:
+    def _extract_links(text: str) -> list[str]:
         # Match [[WikiLink]] style or markdown [Anchor](target.md)
         wiki_links = re.findall(r"\[\[(.*?)\]\]", text)
         cleaned_wiki = [w.split("|")[0].strip() for w in wiki_links]
-        
+
         md_links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", text)
         target_links = [target.strip() for _, target in md_links if not target.startswith("http")]
 

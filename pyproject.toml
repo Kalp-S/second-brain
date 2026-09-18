@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "second-brain"
-version = "0.1.0"
-description = "Personal Knowledge Management system using Advanced Hybrid RAG"
+version = "1.0.0"
+description = "Enterprise-Grade Personal Knowledge Management with Advanced Hybrid RAG"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -29,6 +29,9 @@ dependencies = [
 dev = [
     "pytest>=8.1.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.4.0",
+    "mypy>=1.9.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -38,3 +41,29 @@ packages = ["backend/app"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "-v --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # do not perform function calls in argument defaults (FastAPI Depends)
+]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

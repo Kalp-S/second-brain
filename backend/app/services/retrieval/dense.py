@@ -1,19 +1,24 @@
-import os
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from fastembed import TextEmbedding
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
+
 from backend.app.core.config import settings
 
 COLLECTION_NAME = "second_brain_chunks"
 
+
 class DenseRetriever:
     """Manages local ONNX embeddings and Qdrant vector search."""
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         self.storage_path = storage_path or str(settings.QDRANT_PATH)
         self.embedding_model = TextEmbedding(model_name=settings.EMBEDDING_MODEL)
-        self.client = QdrantClient(path=self.storage_path)
+        if self.storage_path == ":memory:":
+            self.client = QdrantClient(location=":memory:")
+        else:
+            self.client = QdrantClient(path=self.storage_path)
         self._ensure_collection()
 
     def _ensure_collection(self) -> None:
@@ -23,20 +28,19 @@ class DenseRetriever:
             self.client.create_collection(
                 collection_name=COLLECTION_NAME,
                 vectors_config=qmodels.VectorParams(
-                    size=settings.EMBEDDING_DIMENSION,
-                    distance=qmodels.Distance.COSINE
-                )
+                    size=settings.EMBEDDING_DIMENSION, distance=qmodels.Distance.COSINE
+                ),
             )
 
-    def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
         embeddings = list(self.embedding_model.embed(texts))
         return [emb.tolist() for emb in embeddings]
 
-    def embed_query(self, query: str) -> List[float]:
+    def embed_query(self, query: str) -> list[float]:
         embeddings = list(self.embedding_model.embed([f"query: {query}"]))
         return embeddings[0].tolist()
 
-    def index_chunks(self, points: List[Dict[str, Any]]) -> None:
+    def index_chunks(self, points: list[dict[str, Any]]) -> None:
         """
         Points is a list of dicts:
         {
@@ -56,18 +60,10 @@ class DenseRetriever:
             return
 
         qdrant_points = [
-            qmodels.PointStruct(
-                id=p["id"],
-                vector=p["vector"],
-                payload=p["payload"]
-            )
+            qmodels.PointStruct(id=p["id"], vector=p["vector"], payload=p["payload"])
             for p in points
         ]
-        self.client.upsert(
-            collection_name=COLLECTION_NAME,
-            points=qdrant_points,
-            wait=True
-        )
+        self.client.upsert(collection_name=COLLECTION_NAME, points=qdrant_points, wait=True)
 
     def delete_by_document(self, document_id: str) -> None:
         self.client.delete(
@@ -76,29 +72,27 @@ class DenseRetriever:
                 filter=qmodels.Filter(
                     must=[
                         qmodels.FieldCondition(
-                            key="document_id",
-                            match=qmodels.MatchValue(value=document_id)
+                            key="document_id", match=qmodels.MatchValue(value=document_id)
                         )
                     ]
                 )
-            )
+            ),
         )
 
-    def search(self, query: str, top_k: int = 15) -> List[Dict[str, Any]]:
+    def search(self, query: str, top_k: int = 15) -> list[dict[str, Any]]:
         query_vector = self.embed_query(query)
         hits = self.client.query_points(
-            collection_name=COLLECTION_NAME,
-            query=query_vector,
-            limit=top_k,
-            with_payload=True
+            collection_name=COLLECTION_NAME, query=query_vector, limit=top_k, with_payload=True
         ).points
 
         results = []
         for rank, hit in enumerate(hits, start=1):
-            results.append({
-                "id": str(hit.id),
-                "score": float(hit.score),
-                "rank": rank,
-                "payload": hit.payload or {}
-            })
+            results.append(
+                {
+                    "id": str(hit.id),
+                    "score": float(hit.score),
+                    "rank": rank,
+                    "payload": hit.payload or {},
+                }
+            )
         return results

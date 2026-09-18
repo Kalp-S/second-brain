@@ -1,6 +1,8 @@
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from rank_bm25 import BM25Okapi
+
 
 class SparseBM25Retriever:
     """
@@ -10,17 +12,17 @@ class SparseBM25Retriever:
     """
 
     def __init__(self):
-        self.corpus: List[List[str]] = []
-        self.chunk_records: List[Dict[str, Any]] = []
-        self.bm25: Optional[BM25Okapi] = None
+        self.corpus: list[list[str]] = []
+        self.chunk_records: list[dict[str, Any]] = []
+        self.bm25: BM25Okapi | None = None
 
     @staticmethod
-    def tokenize(text: str) -> List[str]:
+    def tokenize(text: str) -> list[str]:
         # Lowercase and split on non-alphanumeric characters while keeping words/identifiers
         tokens = re.findall(r"\b[a-zA-Z0-9_\-]{2,}\b", text.lower())
         return tokens
 
-    def index_chunks(self, records: List[Dict[str, Any]]) -> None:
+    def index_chunks(self, records: list[dict[str, Any]]) -> None:
         """
         records is a list of dicts:
         {
@@ -36,7 +38,9 @@ class SparseBM25Retriever:
         for r in records:
             # Remove any existing record with the same child_id to prevent duplicates
             self.remove_by_id(r.get("child_id") or r.get("id"))
-            tokens = self.tokenize(f"{r.get('doc_title', '')} {r.get('header_path', '')} {r.get('content', '')}")
+            tokens = self.tokenize(
+                f"{r.get('doc_title', '')} {r.get('header_path', '')} {r.get('content', '')}"
+            )
             self.corpus.append(tokens)
             self.chunk_records.append(r)
 
@@ -45,7 +49,8 @@ class SparseBM25Retriever:
 
     def remove_by_id(self, chunk_id: str) -> None:
         indices_to_remove = [
-            i for i, r in enumerate(self.chunk_records)
+            i
+            for i, r in enumerate(self.chunk_records)
             if (r.get("child_id") == chunk_id or r.get("id") == chunk_id)
         ]
         if indices_to_remove:
@@ -59,8 +64,7 @@ class SparseBM25Retriever:
 
     def remove_by_document(self, document_id: str) -> None:
         indices_to_remove = [
-            i for i, r in enumerate(self.chunk_records)
-            if r.get("document_id") == document_id
+            i for i, r in enumerate(self.chunk_records) if r.get("document_id") == document_id
         ]
         if indices_to_remove:
             for idx in reversed(indices_to_remove):
@@ -71,7 +75,7 @@ class SparseBM25Retriever:
             else:
                 self.bm25 = None
 
-    def search(self, query: str, top_k: int = 15) -> List[Dict[str, Any]]:
+    def search(self, query: str, top_k: int = 15) -> list[dict[str, Any]]:
         if not self.bm25 or not self.corpus:
             return []
 
@@ -80,13 +84,9 @@ class SparseBM25Retriever:
             return []
 
         scores = self.bm25.get_scores(query_tokens)
-        
+
         # Sort candidate indices by score descending
-        ranked_indices = sorted(
-            range(len(scores)),
-            key=lambda i: scores[i],
-            reverse=True
-        )
+        ranked_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
 
         results = []
         rank = 1
@@ -94,12 +94,15 @@ class SparseBM25Retriever:
             score = float(scores[idx])
             if score <= 0:
                 break
-            results.append({
-                "id": self.chunk_records[idx].get("child_id") or self.chunk_records[idx].get("id"),
-                "score": score,
-                "rank": rank,
-                "payload": self.chunk_records[idx]
-            })
+            results.append(
+                {
+                    "id": self.chunk_records[idx].get("child_id")
+                    or self.chunk_records[idx].get("id"),
+                    "score": score,
+                    "rank": rank,
+                    "payload": self.chunk_records[idx],
+                }
+            )
             rank += 1
             if rank > top_k:
                 break
