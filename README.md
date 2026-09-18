@@ -2,6 +2,7 @@
 
 <div align="center">
 
+[![CI](https://github.com/Kalp-S/second-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/Kalp-S/second-brain/actions/workflows/ci.yml)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-DC2626?style=for-the-badge&logo=qdrant&logoColor=white)](https://qdrant.tech)
@@ -122,32 +123,28 @@ When evaluating on technical domain queries (e.g. distributed consensus, Modbus 
 
 ### Prerequisites
 - Python 3.12+ (or `uv`)
-- Ollama (optional for 100% offline local inference) or OpenAI API key
+- Ollama (optional for 100% offline local inference with `qwen2.5-coder:3b-instruct`) or OpenAI API key
 
-### 1. Clone & Setup with `uv` (Recommended)
+### 1. One-Command Setup with `Makefile` & `uv` (Recommended)
 ```bash
 # Clone the repository
 git clone https://github.com/Kalp-S/second-brain.git
 cd second-brain
 
-# Create virtual environment with uv (blazingly fast)
-uv venv --python 3.12
-source .venv/bin/activate
-
-# Install dependencies in editable mode with dev tools
-uv pip install -e ".[dev]"
+# Create virtualenv and install all dependencies in editable mode
+make install
 ```
 
 ### 2. Configure Environment (Optional)
 ```bash
 cp .env.example .env
-# By default, runs locally with Ollama.
-# To use OpenAI or Gemini instead, set OPENAI_API_KEY in .env
+# By default, runs 100% locally with Ollama.
+# To use OpenAI, Gemini, or Groq instead, add your API key in .env
 ```
 
-### 3. Run the Server
+### 3. Launch the Server
 ```bash
-uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+make dev
 ```
 Open your browser and navigate to:
 **`http://localhost:8000`**
@@ -157,25 +154,55 @@ Open your browser and navigate to:
 
 ---
 
+## ⚡ Standalone Benchmark CLI (Reproducible RAG Triad)
+
+Run an immediate, automated head-to-head empirical evaluation across all 4 retrieval strategies:
+
+```bash
+make eval
+# Or query a custom technical prompt:
+python -m backend.app.evaluation.benchmark_cli --query "How does Raft leader election handle split votes?"
+```
+
+This generates live stage latency waterfalls, automated RAG Triad evaluation scores (Context Relevance, Faithfulness, Answer Relevance), and exports a structured `eval_benchmark_results.json` artifact.
+
+---
+
+## 🧪 Isolated Automated Test Suite & CI
+
+The test suite runs with complete in-memory isolation (`:memory:` for SQLite and Qdrant vector client), allowing tests to execute independently without file locking collisions:
+
+```bash
+# Run all 14 unit and integration tests
+make test
+
+# Run tests with code coverage report
+make test-cov
+
+# Run code linter
+make lint
+```
+
+---
+
+## 🔍 Production Observability & Tracing
+
+Every request is instrumented with production-grade telemetry:
+- **`X-Request-ID`**: Unique correlation identifier (UUID4) propagated across ASGI middleware for end-to-end request tracing.
+- **`X-Response-Time-Ms`**: Monotonic response latency measurement attached to response headers.
+- **Runtime System Telemetry**: `GET /api/v1/system/status` exposes process memory RSS (`memory_rss_mb`), uptime, active LLM connectivity, and indexing statistics.
+- **Sliding-Window Rate Limiting**: Protects GPU and local inference endpoints against denial-of-service in demo mode.
+
+---
+
 ## 🐳 Docker Deployment
 
-Run the complete platform in a single command with Docker Compose:
+Run the complete platform in a hardened, non-root multi-stage container with Docker Compose:
 
 ```bash
-docker compose up --build
+make docker-up
 ```
 
----
-
-## 🧪 Running Automated Tests
-
-Run the comprehensive unit and integration test suite:
-
-```bash
-pytest tests/ -v
-```
-
----
 
 ## 📁 Repository Structure
 

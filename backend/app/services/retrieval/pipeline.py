@@ -1,29 +1,32 @@
 import time
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from backend.app.core.config import settings
+from backend.app.db.models import ParentChunk
 from backend.app.services.retrieval.dense import DenseRetriever
-from backend.app.services.retrieval.sparse import SparseBM25Retriever
 from backend.app.services.retrieval.fusion import ReciprocalRankFusion
 from backend.app.services.retrieval.reranker import CrossEncoderReranker
-from backend.app.db.models import ParentChunk
+from backend.app.services.retrieval.sparse import SparseBM25Retriever
+
 
 class RetrievalResult:
     def __init__(
         self,
         strategy: str,
-        final_chunks: List[Dict[str, Any]],
+        final_chunks: list[dict[str, Any]],
         context_text: str,
-        citations: List[Dict[str, Any]],
-        trace: Dict[str, Any]
+        citations: list[dict[str, Any]],
+        trace: dict[str, Any],
     ):
         self.strategy = strategy
         self.final_chunks = final_chunks
         self.context_text = context_text
         self.citations = citations
         self.trace = trace
+
 
 class AdvancedRAGRetriever:
     """
@@ -37,9 +40,9 @@ class AdvancedRAGRetriever:
 
     def __init__(
         self,
-        dense_retriever: Optional[DenseRetriever] = None,
-        sparse_retriever: Optional[SparseBM25Retriever] = None,
-        reranker: Optional[CrossEncoderReranker] = None
+        dense_retriever: DenseRetriever | None = None,
+        sparse_retriever: SparseBM25Retriever | None = None,
+        reranker: CrossEncoderReranker | None = None,
     ):
         self.dense = dense_retriever or DenseRetriever()
         self.sparse = sparse_retriever or SparseBM25Retriever()
@@ -51,16 +54,16 @@ class AdvancedRAGRetriever:
         query: str,
         session: AsyncSession,
         strategy: str = "hybrid_reranked",
-        top_k: int = settings.RERANK_TOP_K
+        top_k: int = settings.RERANK_TOP_K,
     ) -> RetrievalResult:
-        trace: Dict[str, Any] = {
+        trace: dict[str, Any] = {
             "query": query,
             "strategy": strategy,
             "latencies_ms": {},
             "dense_hits": [],
             "sparse_hits": [],
             "fused_hits": [],
-            "reranked_hits": []
+            "reranked_hits": [],
         }
 
         t0_total = time.perf_counter()
@@ -77,7 +80,7 @@ class AdvancedRAGRetriever:
                 "rank": h["rank"],
                 "title": h["payload"].get("doc_title", "Unknown"),
                 "header": h["payload"].get("header_path", ""),
-                "snippet": h["payload"].get("content", "")[:120] + "..."
+                "snippet": h["payload"].get("content", "")[:120] + "...",
             }
             for h in dense_hits
         ]
@@ -94,13 +97,13 @@ class AdvancedRAGRetriever:
                 "rank": h["rank"],
                 "title": h["payload"].get("doc_title", "Unknown"),
                 "header": h["payload"].get("header_path", ""),
-                "snippet": h["payload"].get("content", "")[:120] + "..."
+                "snippet": h["payload"].get("content", "")[:120] + "...",
             }
             for h in sparse_hits
         ]
 
         # Determine candidates based on chosen strategy
-        selected_candidates: List[Dict[str, Any]] = []
+        selected_candidates: list[dict[str, Any]] = []
 
         if strategy == "dense_only":
             selected_candidates = dense_hits[:top_k]
@@ -117,7 +120,7 @@ class AdvancedRAGRetriever:
                     "rrf_score": h["score"],
                     "rank": h["rank"],
                     "title": h["payload"].get("doc_title", "Unknown"),
-                    "snippet": h["payload"].get("content", "")[:120] + "..."
+                    "snippet": h["payload"].get("content", "")[:120] + "...",
                 }
                 for h in fused
             ]
@@ -125,7 +128,9 @@ class AdvancedRAGRetriever:
         else:
             # Default: hybrid_reranked
             t0 = time.perf_counter()
-            fused = self.fusion.fuse(dense_hits, sparse_hits, top_k=settings.DENSE_TOP_K + settings.BM25_TOP_K)
+            fused = self.fusion.fuse(
+                dense_hits, sparse_hits, top_k=settings.DENSE_TOP_K + settings.BM25_TOP_K
+            )
             t_fusion = (time.perf_counter() - t0) * 1000
             trace["latencies_ms"]["fusion"] = round(t_fusion, 2)
             trace["fused_hits"] = [
@@ -134,7 +139,7 @@ class AdvancedRAGRetriever:
                     "rrf_score": h["score"],
                     "rank": h["rank"],
                     "title": h["payload"].get("doc_title", "Unknown"),
-                    "snippet": h["payload"].get("content", "")[:120] + "..."
+                    "snippet": h["payload"].get("content", "")[:120] + "...",
                 }
                 for h in fused
             ]
@@ -149,7 +154,7 @@ class AdvancedRAGRetriever:
                     "rerank_score": h["score"],
                     "rank": h["rank"],
                     "title": h["payload"].get("doc_title", "Unknown"),
-                    "snippet": h["payload"].get("content", "")[:120] + "..."
+                    "snippet": h["payload"].get("content", "")[:120] + "...",
                 }
                 for h in reranked
             ]
@@ -157,13 +162,17 @@ class AdvancedRAGRetriever:
 
         # Step 3: Hierarchical Parent Context Expansion
         # Map child chunk IDs back to parent chunks to retrieve full contextual sections
-        parent_ids = list(dict.fromkeys([
-            c["payload"].get("parent_id")
-            for c in selected_candidates
-            if c.get("payload", {}).get("parent_id")
-        ]))
+        parent_ids = list(
+            dict.fromkeys(
+                [
+                    c["payload"].get("parent_id")
+                    for c in selected_candidates
+                    if c.get("payload", {}).get("parent_id")
+                ]
+            )
+        )
 
-        parent_map: Dict[str, ParentChunk] = {}
+        parent_map: dict[str, ParentChunk] = {}
         if parent_ids:
             statement = select(ParentChunk).where(ParentChunk.id.in_(parent_ids))
             db_res = await session.execute(statement)
@@ -171,8 +180,8 @@ class AdvancedRAGRetriever:
                 parent_map[p.id] = p
 
         # Assemble Citations & Context String
-        citations: List[Dict[str, Any]] = []
-        context_blocks: List[str] = []
+        citations: list[dict[str, Any]] = []
+        context_blocks: list[str] = []
         seen_parents = set()
 
         for idx, candidate in enumerate(selected_candidates, start=1):
@@ -199,7 +208,9 @@ class AdvancedRAGRetriever:
                 "doc_title": doc_title,
                 "header_path": header_path,
                 "score": candidate.get("score", 0.0),
-                "snippet": child_content[:200] + "..." if len(child_content) > 200 else child_content
+                "snippet": child_content[:200] + "..."
+                if len(child_content) > 200
+                else child_content,
             }
             citations.append(citation)
 
@@ -214,5 +225,5 @@ class AdvancedRAGRetriever:
             final_chunks=selected_candidates,
             context_text="\n\n".join(context_blocks),
             citations=citations,
-            trace=trace
+            trace=trace,
         )

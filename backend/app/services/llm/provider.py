@@ -1,9 +1,12 @@
 import json
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
+
 import httpx
+
 from backend.app.core.config import settings
 from backend.app.services.llm.prompt import SYSTEM_PROMPT
+
 
 class BaseLLMProvider(ABC):
     @abstractmethod
@@ -16,8 +19,11 @@ class BaseLLMProvider(ABC):
     ) -> AsyncGenerator[str, None]:
         pass
 
+
 class OllamaProvider(BaseLLMProvider):
-    def __init__(self, base_url: str = settings.OLLAMA_BASE_URL, model: str = settings.OLLAMA_MODEL):
+    def __init__(
+        self, base_url: str = settings.OLLAMA_BASE_URL, model: str = settings.OLLAMA_MODEL
+    ):
         self.base_url = base_url.rstrip("/")
         self.model = model
 
@@ -29,8 +35,8 @@ class OllamaProvider(BaseLLMProvider):
                     "model": self.model,
                     "prompt": prompt,
                     "system": system_prompt,
-                    "stream": False
-                }
+                    "stream": False,
+                },
             )
             resp.raise_for_status()
             data = resp.json()
@@ -47,8 +53,8 @@ class OllamaProvider(BaseLLMProvider):
                     "model": self.model,
                     "prompt": prompt,
                     "system": system_prompt,
-                    "stream": True
-                }
+                    "stream": True,
+                },
             ) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
@@ -59,6 +65,7 @@ class OllamaProvider(BaseLLMProvider):
                             yield token
                         if chunk.get("done", False):
                             break
+
 
 class OpenAIProvider(BaseLLMProvider):
     def __init__(self, api_key: str = settings.OPENAI_API_KEY, model: str = settings.OPENAI_MODEL):
@@ -72,12 +79,14 @@ class OpenAIProvider(BaseLLMProvider):
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt},
             ],
-            "stream": False
+            "stream": False,
         }
         async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+            resp = await client.post(
+                f"{self.base_url}/chat/completions", headers=headers, json=payload
+            )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
 
@@ -89,9 +98,9 @@ class OpenAIProvider(BaseLLMProvider):
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt},
             ],
-            "stream": True
+            "stream": True,
         }
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream(
@@ -105,8 +114,10 @@ class OpenAIProvider(BaseLLMProvider):
                         if delta:
                             yield delta
 
+
 class MockProvider(BaseLLMProvider):
     """Deterministic fallback provider for testing and offline environments."""
+
     async def generate(self, prompt: str, system_prompt: str = SYSTEM_PROMPT) -> str:
         return "Based on your Second Brain notes [1], the system architecture relies on hybrid retrieval and parent-child chunking [2]."
 
@@ -114,12 +125,23 @@ class MockProvider(BaseLLMProvider):
         self, prompt: str, system_prompt: str = SYSTEM_PROMPT
     ) -> AsyncGenerator[str, None]:
         tokens = [
-            "Based on ", "your Second ", "Brain notes ", "[1], ",
-            "the architecture ", "implements hybrid ", "retrieval ", "with ",
-            "reciprocal rank ", "fusion ", "and cross-encoder ", "reranking ", "[2]."
+            "Based on ",
+            "your Second ",
+            "Brain notes ",
+            "[1], ",
+            "the architecture ",
+            "implements hybrid ",
+            "retrieval ",
+            "with ",
+            "reciprocal rank ",
+            "fusion ",
+            "and cross-encoder ",
+            "reranking ",
+            "[2].",
         ]
         for t in tokens:
             yield t
+
 
 def get_llm_provider() -> BaseLLMProvider:
     if settings.LLM_PROVIDER == "openai" and settings.OPENAI_API_KEY:

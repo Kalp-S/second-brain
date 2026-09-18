@@ -1,17 +1,24 @@
+import platform
+import resource
+import time
+from typing import Any
+
 import httpx
-from typing import Dict, Any
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select, func
+from sqlmodel import func, select
 
 from backend.app.core.config import settings
 from backend.app.db.database import get_db
-from backend.app.db.models import Document, ParentChunk, ChildChunk
+from backend.app.db.models import ChildChunk, Document, ParentChunk
 
 router = APIRouter(prefix="/system", tags=["System & Health"])
 
+
 @router.get("/status")
-async def get_system_status(session: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
+async def get_system_status(session: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    from backend.app.main import SERVER_START_TIME
+
     # Check Ollama connectivity
     ollama_status = "unavailable"
     available_models = []
@@ -29,20 +36,37 @@ async def get_system_status(session: AsyncSession = Depends(get_db)) -> Dict[str
     parent_count = (await session.execute(select(func.count(ParentChunk.id)))).scalar() or 0
     child_count = (await session.execute(select(func.count(ChildChunk.id)))).scalar() or 0
 
+    # Process RSS Memory (Linux maxrss is in kilobytes)
+    try:
+        max_rss_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        memory_rss_mb = round(max_rss_kb / 1024, 1)
+    except Exception:
+        memory_rss_mb = 0.0
+
+    uptime_sec = round(time.time() - SERVER_START_TIME, 1)
+
     return {
         "status": "healthy",
         "demo_mode": settings.DEMO_MODE,
         "app_name": settings.APP_NAME,
         "version": settings.APP_VERSION,
+        "runtime": {
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "uptime_seconds": uptime_sec,
+            "memory_rss_mb": memory_rss_mb,
+        },
         "llm_provider": settings.LLM_PROVIDER,
         "ollama_status": ollama_status,
-        "active_llm_model": settings.OLLAMA_MODEL if settings.LLM_PROVIDER == "ollama" else settings.OPENAI_MODEL,
+        "active_llm_model": settings.OLLAMA_MODEL
+        if settings.LLM_PROVIDER == "ollama"
+        else settings.OPENAI_MODEL,
         "available_ollama_models": available_models,
         "embedding_model": settings.EMBEDDING_MODEL,
         "reranker_model": settings.RERANKER_MODEL,
         "vault_statistics": {
             "documents": doc_count,
             "parent_chunks": parent_count,
-            "child_chunks": child_count
-        }
+            "child_chunks": child_count,
+        },
     }

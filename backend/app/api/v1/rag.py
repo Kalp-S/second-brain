@@ -1,67 +1,77 @@
 import json
 import time
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Any
+
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from backend.app.core.dependencies import (
+    AdvancedRAGRetriever,
+    BaseLLMProvider,
+    get_llm,
+    get_rag_retriever,
+)
 from backend.app.db.database import get_db
-from backend.app.db.models import ChatSession, ChatMessage, EvaluationRecord
-from backend.app.core.dependencies import get_rag_retriever, get_llm, AdvancedRAGRetriever, BaseLLMProvider
-from backend.app.services.llm.prompt import build_rag_prompt, SYSTEM_PROMPT
+from backend.app.db.models import ChatMessage, ChatSession, EvaluationRecord
 from backend.app.services.llm.evaluator import RAGTriadEvaluator
+from backend.app.services.llm.prompt import SYSTEM_PROMPT, build_rag_prompt
 
 router = APIRouter(prefix="/rag", tags=["RAG"])
 
+
 class QueryRequest(BaseModel):
     query: str = Field(..., description="User question to query against the Second Brain")
-    strategy: str = Field(default="hybrid_reranked", description="dense_only | bm25_only | hybrid | hybrid_reranked")
-    session_id: Optional[str] = Field(default=None, description="Optional chat session ID for multi-turn conversation")
+    strategy: str = Field(
+        default="hybrid_reranked", description="dense_only | bm25_only | hybrid | hybrid_reranked"
+    )
+    session_id: str | None = Field(
+        default=None, description="Optional chat session ID for multi-turn conversation"
+    )
     top_k: int = Field(default=5, description="Number of top reranked passages to retrieve")
 
+
 @router.get("/strategies")
-async def list_strategies() -> List[Dict[str, str]]:
+async def list_strategies() -> list[dict[str, str]]:
     return [
         {
             "id": "hybrid_reranked",
             "name": "Hybrid + Cross-Encoder Rerank (Recommended)",
-            "description": "Dense vectors + Sparse BM25 fused via RRF, then scored by a Cross-Encoder transformer. Highest precision."
+            "description": "Dense vectors + Sparse BM25 fused via RRF, then scored by a Cross-Encoder transformer. Highest precision.",
         },
         {
             "id": "hybrid",
             "name": "Hybrid RRF (Dense + BM25)",
-            "description": "Dense semantic vectors + Sparse BM25 lexical search merged with Reciprocal Rank Fusion."
+            "description": "Dense semantic vectors + Sparse BM25 lexical search merged with Reciprocal Rank Fusion.",
         },
         {
             "id": "dense_only",
             "name": "Dense Vector Search Only",
-            "description": "Pure semantic embedding similarity using BGE-small cosine distance."
+            "description": "Pure semantic embedding similarity using BGE-small cosine distance.",
         },
         {
             "id": "bm25_only",
             "name": "Sparse BM25 Search Only",
-            "description": "Pure lexical keyword search. Excels at exact technical tokens and identifiers."
-        }
+            "description": "Pure lexical keyword search. Excels at exact technical tokens and identifiers.",
+        },
     ]
+
 
 @router.post("/query")
 async def query_rag(
     req: QueryRequest,
     session: AsyncSession = Depends(get_db),
     retriever: AdvancedRAGRetriever = Depends(get_rag_retriever),
-    llm: BaseLLMProvider = Depends(get_llm)
-) -> Dict[str, Any]:
+    llm: BaseLLMProvider = Depends(get_llm),
+) -> dict[str, Any]:
     """Execute complete RAG pipeline with retrieval, generation, and automated evaluation."""
     t0_start = time.perf_counter()
 
     # 1. Advanced Multi-Stage Retrieval
     retrieval_res = await retriever.retrieve(
-        query=req.query,
-        session=session,
-        strategy=req.strategy,
-        top_k=req.top_k
+        query=req.query, session=session, strategy=req.strategy, top_k=req.top_k
     )
 
     # 2. Assemble Grounded Prompt
@@ -75,9 +85,7 @@ async def query_rag(
 
     # 4. Automated RAG Triad Evaluation
     eval_metrics = RAGTriadEvaluator.evaluate(
-        query=req.query,
-        retrieved_context=retrieval_res.context_text,
-        generated_answer=answer
+        query=req.query, retrieved_context=retrieval_res.context_text, generated_answer=answer
     )
 
     total_time_ms = round((time.perf_counter() - t0_start) * 1000, 2)
@@ -92,10 +100,7 @@ async def query_rag(
         session_id = chat_sess.id
 
     user_msg = ChatMessage(
-        session_id=session_id,
-        role="user",
-        content=req.query,
-        strategy=req.strategy
+        session_id=session_id, role="user", content=req.query, strategy=req.strategy
     )
     assistant_msg = ChatMessage(
         session_id=session_id,
@@ -104,7 +109,7 @@ async def query_rag(
         strategy=req.strategy,
         citations=json.dumps(retrieval_res.citations),
         retrieval_trace=json.dumps(retrieval_res.trace),
-        faithfulness_score=eval_metrics["faithfulness"]
+        faithfulness_score=eval_metrics["faithfulness"],
     )
     session.add(user_msg)
     session.add(assistant_msg)
@@ -116,7 +121,7 @@ async def query_rag(
         context_relevance=eval_metrics["context_relevance"],
         faithfulness=eval_metrics["faithfulness"],
         answer_relevance=eval_metrics["answer_relevance"],
-        latency_ms=total_time_ms
+        latency_ms=total_time_ms,
     )
     session.add(eval_rec)
     await session.commit()
@@ -127,22 +132,20 @@ async def query_rag(
         "strategy": req.strategy,
         "citations": retrieval_res.citations,
         "evaluation": eval_metrics,
-        "trace": retrieval_res.trace
+        "trace": retrieval_res.trace,
     }
+
 
 @router.post("/stream")
 async def stream_rag(
     req: QueryRequest,
     session: AsyncSession = Depends(get_db),
     retriever: AdvancedRAGRetriever = Depends(get_rag_retriever),
-    llm: BaseLLMProvider = Depends(get_llm)
+    llm: BaseLLMProvider = Depends(get_llm),
 ):
     """Server-Sent Events (SSE) streaming endpoint for low Time-to-First-Token (TTFT) interactions."""
     retrieval_res = await retriever.retrieve(
-        query=req.query,
-        session=session,
-        strategy=req.strategy,
-        top_k=req.top_k
+        query=req.query, session=session, strategy=req.strategy, top_k=req.top_k
     )
 
     rag_prompt = build_rag_prompt(req.query, retrieval_res.context_text)
@@ -168,7 +171,7 @@ async def stream_rag(
         eval_metrics = RAGTriadEvaluator.evaluate(
             query=req.query,
             retrieved_context=retrieval_res.context_text,
-            generated_answer=full_answer
+            generated_answer=full_answer,
         )
         yield f"event: eval\ndata: {json.dumps(eval_metrics)}\n\n"
 
@@ -184,12 +187,13 @@ async def stream_rag(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
+            "X-Accel-Buffering": "no",
+        },
     )
 
+
 @router.get("/sessions")
-async def list_chat_sessions(session: AsyncSession = Depends(get_db)) -> List[Dict[str, Any]]:
+async def list_chat_sessions(session: AsyncSession = Depends(get_db)) -> list[dict[str, Any]]:
     stmt = select(ChatSession).order_by(ChatSession.updated_at.desc())
     res = await session.execute(stmt)
     sessions = res.scalars().all()
@@ -198,14 +202,21 @@ async def list_chat_sessions(session: AsyncSession = Depends(get_db)) -> List[Di
             "id": s.id,
             "title": s.title,
             "created_at": s.created_at.isoformat() if s.created_at else None,
-            "updated_at": s.updated_at.isoformat() if s.updated_at else None
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
         }
         for s in sessions
     ]
 
+
 @router.get("/sessions/{session_id}/messages")
-async def get_session_messages(session_id: str, session: AsyncSession = Depends(get_db)) -> List[Dict[str, Any]]:
-    stmt = select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at.asc())
+async def get_session_messages(
+    session_id: str, session: AsyncSession = Depends(get_db)
+) -> list[dict[str, Any]]:
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.asc())
+    )
     res = await session.execute(stmt)
     messages = res.scalars().all()
     output = []
@@ -222,14 +233,16 @@ async def get_session_messages(session_id: str, session: AsyncSession = Depends(
         except Exception:
             pass
 
-        output.append({
-            "id": m.id,
-            "role": m.role,
-            "content": m.content,
-            "strategy": m.strategy,
-            "citations": citations,
-            "trace": trace,
-            "faithfulness_score": m.faithfulness_score,
-            "created_at": m.created_at.isoformat() if m.created_at else None
-        })
+        output.append(
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "strategy": m.strategy,
+                "citations": citations,
+                "trace": trace,
+                "faithfulness_score": m.faithfulness_score,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+        )
     return output

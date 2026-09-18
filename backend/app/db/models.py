@@ -1,13 +1,16 @@
-from datetime import datetime, timezone
-from typing import Optional, List
-from sqlmodel import SQLModel, Field, Relationship
 import uuid
+from datetime import UTC, datetime
+
+from sqlmodel import Field, Relationship, SQLModel
+
 
 def generate_uuid() -> str:
     return str(uuid.uuid4())
 
+
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
+
 
 class Document(SQLModel, table=True):
     __tablename__ = "documents"
@@ -23,7 +26,8 @@ class Document(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
-    parents: List["ParentChunk"] = Relationship(back_populates="document", cascade_delete=True)
+    parents: list["ParentChunk"] = Relationship(back_populates="document", cascade_delete=True)
+
 
 class ParentChunk(SQLModel, table=True):
     __tablename__ = "parent_chunks"
@@ -36,8 +40,9 @@ class ParentChunk(SQLModel, table=True):
     token_count: int = Field(default=0)
     created_at: datetime = Field(default_factory=utc_now)
 
-    document: Optional[Document] = Relationship(back_populates="parents")
-    children: List["ChildChunk"] = Relationship(back_populates="parent_chunk", cascade_delete=True)
+    document: Document | None = Relationship(back_populates="parents")
+    children: list["ChildChunk"] = Relationship(back_populates="parent_chunk", cascade_delete=True)
+
 
 class ChildChunk(SQLModel, table=True):
     __tablename__ = "child_chunks"
@@ -51,7 +56,8 @@ class ChildChunk(SQLModel, table=True):
     token_count: int = Field(default=0)
     created_at: datetime = Field(default_factory=utc_now)
 
-    parent_chunk: Optional[ParentChunk] = Relationship(back_populates="children")
+    parent_chunk: ParentChunk | None = Relationship(back_populates="children")
+
 
 class ChatSession(SQLModel, table=True):
     __tablename__ = "chat_sessions"
@@ -61,7 +67,8 @@ class ChatSession(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
-    messages: List["ChatMessage"] = Relationship(back_populates="session", cascade_delete=True)
+    messages: list["ChatMessage"] = Relationship(back_populates="session", cascade_delete=True)
+
 
 class ChatMessage(SQLModel, table=True):
     __tablename__ = "chat_messages"
@@ -73,10 +80,11 @@ class ChatMessage(SQLModel, table=True):
     strategy: str = Field(default="hybrid_reranked")
     citations: str = Field(default="[]")  # JSON string of source citations
     retrieval_trace: str = Field(default="{}")  # JSON string of retrieval steps
-    faithfulness_score: Optional[float] = Field(default=None)
+    faithfulness_score: float | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
 
-    session: Optional[ChatSession] = Relationship(back_populates="messages")
+    session: ChatSession | None = Relationship(back_populates="messages")
+
 
 class EvaluationRecord(SQLModel, table=True):
     __tablename__ = "evaluation_records"

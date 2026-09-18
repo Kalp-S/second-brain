@@ -1,10 +1,11 @@
-from typing import List, Dict, Any
+from typing import Any
+
 
 class ReciprocalRankFusion:
     """
     Implements Reciprocal Rank Fusion (RRF) to merge candidate rankings
     from heterogeneous retrieval systems (Dense Vector + Sparse Lexical).
-    
+
     Formula: RRF_Score(d) = sum_m [ w_m / (k + rank_m(d)) ]
     where k is a smoothing constant (typically 60) that prevents top ranks
     from disproportionately dominating.
@@ -16,14 +17,11 @@ class ReciprocalRankFusion:
         self.sparse_weight = sparse_weight
 
     def fuse(
-        self,
-        dense_hits: List[Dict[str, Any]],
-        sparse_hits: List[Dict[str, Any]],
-        top_k: int = 20
-    ) -> List[Dict[str, Any]]:
-        scores: Dict[str, float] = {}
-        metadata: Dict[str, Dict[str, Any]] = {}
-        provenance: Dict[str, Dict[str, Any]] = {}
+        self, dense_hits: list[dict[str, Any]], sparse_hits: list[dict[str, Any]], top_k: int = 20
+    ) -> list[dict[str, Any]]:
+        scores: dict[str, float] = {}
+        metadata: dict[str, dict[str, Any]] = {}
+        provenance: dict[str, dict[str, Any]] = {}
 
         # Process Dense hits
         for item in dense_hits:
@@ -56,14 +54,16 @@ class ReciprocalRankFusion:
         # Sort by fused RRF score descending
         sorted_items = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
-        fused_results: List[Dict[str, Any]] = []
+        fused_results: list[dict[str, Any]] = []
         for rank, (item_id, rrf_score) in enumerate(sorted_items[:top_k], start=1):
-            fused_results.append({
-                "id": item_id,
-                "score": round(rrf_score, 6),
-                "rank": rank,
-                "provenance": provenance.get(item_id, {}),
-                "payload": metadata.get(item_id, {})
-            })
+            fused_results.append(
+                {
+                    "id": item_id,
+                    "score": round(rrf_score, 6),
+                    "rank": rank,
+                    "provenance": provenance.get(item_id, {}),
+                    "payload": metadata.get(item_id, {}),
+                }
+            )
 
         return fused_results
